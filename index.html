@@ -1,0 +1,209 @@
+﻿<!DOCTYPE HTML>
+<html lang="ja">
+<title>避難所の混雑状況の可視化マップ</title>
+
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+	<meta charset="UTF-8" name="viewport"
+		content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta property="og:title" content="避難所の混雑状況の可視化マップ" />
+	<meta property="og:type" content="website" />
+	<meta property="og:image" content="https://refugecrowdingratemap.netlify.app/ogp.png" />
+	<meta name="description" content="避難所の混雑状況を色分けで、可視化するマップです。このマップは、オープンソース化してありますので、自治体の方々などに有効活用していただければと思います。" />
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="避難所の混雑状況の可視化マップ" />
+	<meta name="twitter:image" content="https://refugecrowdingratemap.netlify.app/ogp.png" />
+	<meta name="author" content="仁志">
+	<meta name="keywords" content="防災,避難,避難所,混雑状況,オープンソース" />
+
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-MPP84V2NHB"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag() { dataLayer.push(arguments); }
+		gtag('js', new Date());
+
+		gtag('config', 'G-MPP84V2NHB');
+	</script>
+
+	<!-- leaflet -->
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+		integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin="" />
+	<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+		integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+
+	<script type="text/javascript"
+		src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+	<link rel="stylesheet" type="text/css" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+	<link rel="stylesheet" type="text/css"
+		href="https://unpkg.com/leaflet.markercluster@1.4.1/dist//MarkerCluster.Default.css">
+
+	<style>
+		html,
+		body,
+		#map {
+			width: 100%;
+			height: 100%;
+			padding: 0;
+			margin: 0;
+		}
+
+		.info_legend {
+			background-color: rgba(255, 255, 255, 0.7);
+			padding: 10px;
+			margin-bottom: 20px;
+			border: solid 2px #000000;
+		}
+	</style>
+
+	<title>情報共有マップ</title>
+
+	<script>
+
+		onload = async () => {
+
+			const map = L.map('map');
+
+			const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+				maxZoom: 19,
+				attribution: '&copy; <a href="http://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>｜<a href="https://github.com/linkevery2s/refuge_crouding_rate_map" target="_blank">src on GitHub</a>'
+			}).addTo(map);
+
+			const id = "AKfycbwaeZ1JtoNfTwxL69NWdagGuc-Q8yGKmolZ-rgYzip-hgepTE4_KsnSQuE_yof1QdE0";
+
+			const res = await fetch("https://script.google.com/macros/s/" + id + "/exec");
+			const data = await res.json();
+
+			let pref = L.geoJSON(data, { onEachFeature: popup_pin, pointToLayer: color }).addTo(map);
+
+			map.addLayer(pref);
+
+			map.fitBounds(pref.getBounds());
+
+			const legend = L.control({
+				position: 'bottomright'
+			});
+
+			let getColor = (d) => {
+				return d == "80%以上" ? '#FF0000' :
+					d == "60%以上" ? '#FF9900' :
+						d == "40%以上" ? '#FFFF00' :
+							d == "20%以上" ? '#00FF00' :
+								'#0000FF';
+			}
+
+			legend.onAdd = (map) => {
+
+				let div = L.DomUtil.create('div', 'info_legend'),
+					grades = ["80%以上", "60%以上", "40%以上", "20%以上", "0%以上"],
+					labels = ['混雑状況'],
+					from, to;
+
+				for (let i = 0; i < grades.length; i++) {
+					from = grades[i];
+
+					labels.push(
+						'<span style="background:' + getColor(from) + '">　</span> ' +
+						from);
+				}
+
+				div.innerHTML = labels.join('<br>');
+				return div;
+			};
+
+			legend.addTo(map);
+
+		}
+
+		/* Popup Display */
+		let popup_pin = (feature, layer) => {
+			let popup;
+			if (feature.properties && feature.properties.name) {
+				popup = "施設名：" + feature.properties.name;
+
+				popup += "<br>場所：" + feature.properties.place;
+
+				popup += "<br>TEL：" + feature.properties.tel;
+
+				popup += "<br><br>避難人数／収容人数：<br>" + feature.properties.number + "人 ／ " + feature.properties.max + "人";
+
+			} else { };
+
+			layer.bindPopup(popup);
+		}
+
+		let color = (feature, latlng) => {
+
+			if (feature.properties.rate > 80) {
+
+				return L.circleMarker(latlng, {
+					radius: 10,
+					fillColor: "#FF0000",
+					color: "#FFFFFF",
+					weight: 2,
+					opacity: 1,
+					fillOpacity: 0.8
+				});
+
+			} else if (feature.properties.rate > 60) {
+
+				return L.circleMarker(latlng, {
+					radius: 10,
+					fillColor: "#FF9900",
+					color: "#FFFFFF",
+					weight: 2,
+					opacity: 1,
+					fillOpacity: 0.8
+				});
+
+			} else if (feature.properties.rate > 40) {
+
+				return L.circleMarker(latlng, {
+					radius: 10,
+					fillColor: "#FFFF00",
+					color: "#FFFFFF",
+					weight: 2,
+					opacity: 1,
+					fillOpacity: 0.8
+				});
+
+			} else if (feature.properties.rate > 20) {
+
+				return L.circleMarker(latlng, {
+					radius: 10,
+					fillColor: "#00FF00",
+					color: "#FFFFFF",
+					weight: 2,
+					opacity: 1,
+					fillOpacity: 0.8
+				});
+
+			} else {
+
+				return L.circleMarker(latlng, {
+					radius: 10,
+					fillColor: "#0000FF",
+					color: "#FFFFFF",
+					weight: 2,
+					opacity: 1,
+					fillOpacity: 0.8
+				});
+
+			}
+
+
+		}
+
+
+
+	</script>
+
+
+</head>
+
+<body>
+	<div id='map'></div>
+
+</body>
+
+</html>
